@@ -1,10 +1,8 @@
 package com.autodoc.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
+import jakarta.persistence.*;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Date;
 
 @Entity
@@ -48,27 +46,23 @@ public class Usuario {
     @Column(nullable = false)
     private String role;
 
-    // Getters and Setters
+    @Transient
+    private static final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
     public String getId() {
         return id;
     }
 
-    public String getPassword() { return password; }
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getPassword() {
+        return password;
+    }
 
     public void setPassword(String password) {
         this.password = password;
-    }
-
-    public Boolean getVerified() {
-        return isVerified;
-    }
-
-    public void setVerified(Boolean verified) {
-        isVerified = verified;
-    }
-
-    public void setId(String id) {
-        this.id = id;
     }
 
     public String getPlan() {
@@ -127,12 +121,12 @@ public class Usuario {
         this.disabled = disabled;
     }
 
-    public Boolean getIsVerified() {
+    public Boolean getVerified() {
         return isVerified;
     }
 
-    public void setIsVerified(Boolean isVerified) {
-        this.isVerified = isVerified;
+    public void setVerified(Boolean verified) {
+        isVerified = verified;
     }
 
     public String getAppId() {
@@ -157,5 +151,23 @@ public class Usuario {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        this.createdDate = new Date();
+        this.updatedDate = new Date();
+        if (this.password != null) {
+            this.password = passwordEncoder.encode(this.password);
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedDate = new Date();
+    }
+
+    public boolean checkPassword(String rawPassword) {
+        return passwordEncoder.matches(rawPassword, this.password);
     }
 }

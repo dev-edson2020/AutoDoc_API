@@ -3,7 +3,6 @@ package com.autodoc.controller;
 import com.autodoc.dto.UsuarioDTO;
 import com.autodoc.model.Usuario;
 import com.autodoc.service.UsuarioService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,45 +10,68 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/users")
 public class UsuarioController {
 
-    @Autowired
-    private UsuarioService userService;
+    private final UsuarioService userService;
+
+    public UsuarioController(UsuarioService userService) {
+        this.userService = userService;
+    }
 
     @PostMapping
-    public ResponseEntity<Usuario> createUser(@RequestBody UsuarioDTO userDto) {
-        Usuario user = userService.createUser(userDto);
-        return ResponseEntity.ok(user);
+    public ResponseEntity<?> createUser(@RequestBody UsuarioDTO userDto) {
+        try {
+            Usuario user = userService.criarUsuario(userDto);
+            return ResponseEntity.ok(user);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao criar usuário");
+        }
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Usuario> getUserById(@PathVariable String id) {
-        Usuario user = userService.getUserById(id);
-        if (user != null) {
-            return ResponseEntity.ok(user);
+    public ResponseEntity<?> getUserById(@PathVariable String id) {
+        try {
+            return userService.getUserById(id)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao buscar usuário");
         }
-        return ResponseEntity.notFound().build();
     }
 
     @GetMapping("/email/{email}")
-    public ResponseEntity<Usuario> getUserByEmail(@PathVariable String email) {
-        Usuario user = userService.getUserByEmail(email);
-        if (user != null) {
-            return ResponseEntity.ok(user);
+    public ResponseEntity<?> getUserByEmail(@PathVariable String email) {
+        try {
+            return userService.getUserByEmail(email)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao buscar usuário por email");
         }
-        return ResponseEntity.notFound().build();
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Usuario> updateUser(@PathVariable String id, @RequestBody UsuarioDTO userDto) {
-        Usuario user = userService.updateUser(id, userDto);
-        if (user != null) {
-            return ResponseEntity.ok(user);
+    public ResponseEntity<?> updateUser(@PathVariable String id, @RequestBody UsuarioDTO userDto) {
+        try {
+            return userService.updateUser(id, userDto)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao atualizar usuário");
         }
-        return ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable String id) {
-        userService.deleteUser(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteUser(@PathVariable String id) {
+        try {
+            if (userService.deleteUser(id)) {
+                return ResponseEntity.noContent().build();
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao deletar usuário");
+        }
     }
 }

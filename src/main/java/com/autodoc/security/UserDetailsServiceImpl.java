@@ -7,6 +7,7 @@ import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.Optional;
 
 @Service
 public class UserDetailsServiceImpl implements UserDetailsService {
@@ -16,11 +17,16 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        Usuario user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new UsernameNotFoundException("Usuário não encontrado com email: " + email);
-        }
+        Optional<Usuario> userOpt = userRepository.findByEmail(email);
 
-        return new User(user.getEmail(), "{noop}senha_temporaria", Collections.emptyList());
+        Usuario user = userOpt.orElseThrow(() ->
+                new UsernameNotFoundException("Usuário não encontrado com email: " + email)
+        );
+
+        return new User(
+                user.getEmail(),
+                user.getPassword(),  // Use a senha hasheada do usuário
+                Collections.emptyList()  // Ou carregue as roles/autoridades do usuário
+        );
     }
 }

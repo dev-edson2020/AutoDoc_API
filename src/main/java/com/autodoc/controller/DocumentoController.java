@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/documento")
@@ -27,6 +28,7 @@ public class DocumentoController {
 
     @PostMapping("/gerar")
     public ResponseEntity<?> criarDocumento(@RequestBody DocumentoDTO dto) {
+        // Validações
         if (dto.getCreatorEmail() == null || dto.getCreatorEmail().isBlank()) {
             return ResponseEntity.badRequest().body("Campo 'creatorEmail' é obrigatório");
         }
@@ -41,11 +43,16 @@ public class DocumentoController {
         }
 
         try {
+            // Verifica se o usuário existe
+            Usuario usuario = usuarioRepository.findByEmail(dto.getCreatorEmail())
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado com email: " + dto.getCreatorEmail()));
+
             Documento documento = documentoService.gerarDocumento(dto);
             return ResponseEntity.ok(documento);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Erro ao gerar documento: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Erro ao gerar documento: " + e.getMessage());
         }
     }
 
@@ -55,17 +62,18 @@ public class DocumentoController {
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<Void> atualizarStatus(
+    public ResponseEntity<?> atualizarStatus(
             @PathVariable Long id,
             @RequestBody StatusUpdateRequest request) {
-        StatusDocumento novoStatus;
         try {
-            novoStatus = StatusDocumento.valueOf(request.getStatus().toUpperCase());
+            StatusDocumento novoStatus = StatusDocumento.valueOf(request.getStatus().toUpperCase());
+            documentoService.atualizarStatus(id, novoStatus);
+            return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body("Status inválido: " + request.getStatus());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao atualizar status: " + e.getMessage());
         }
-        documentoService.atualizarStatus(id, novoStatus);
-        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/listar")
@@ -75,33 +83,37 @@ public class DocumentoController {
     }
 
     @GetMapping("/dashboard/{email}")
-    public ResponseEntity<Map<String, Object>> getDashboard(@PathVariable String email) {
-        Optional<Usuario> userOpt = Optional.ofNullable(usuarioRepository.findByEmail(email));
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Usuário não encontrado"));
+    public ResponseEntity<?> getDashboard(@PathVariable String email) {
+        try {
+            Usuario usuario = usuarioRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+            List<Documento> allDocs = documentoRepository.findByCreatedBy(email);
+            LocalDate now = LocalDate.now();
+
+            // Documentos deste mês
+            long documentsThisMonth = allDocs.stream()
+                    .filter(doc -> doc.getCreatedDate().toLocalDate().getMonth() == now.getMonth() &&
+                            doc.getCreatedDate().toLocalDate().getYear() == now.getYear())
+                    .count();
+
+            // Documentos recentes (últimos 5)
+            List<Documento> recentDocuments = allDocs.stream()
+                    .sorted(Comparator.comparing(Documento::getCreatedDate).reversed())
+                    .limit(5)
+                    .collect(Collectors.toList());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("documentsThisMonth", documentsThisMonth);
+            response.put("recentDocuments", recentDocuments);
+            response.put("plan", usuario.getPlan());
+            response.put("userName", usuario.getFullName());
+
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao carregar dashboard");
         }
-        Usuario usuario = userOpt.get();
-
-        List<Documento> allDocs = documentoRepository.findByCreatedBy(email);
-
-        LocalDate now = LocalDate.now();
-        long documentsThisMonth = allDocs.stream()
-                .filter(doc -> {
-                    LocalDate created = doc.getCreatedDate().toLocalDate();
-                    return created.getMonth() == now.getMonth() && created.getYear() == now.getYear();
-                })
-                .count();
-
-        List<Documento> recentDocuments = allDocs.stream()
-                .sorted(Comparator.comparing(Documento::getCreatedDate).reversed())
-                .limit(5)
-                .toList();
-
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("documentsThisMonth", documentsThisMonth);
-        resp.put("recentDocuments", recentDocuments);
-        resp.put("plan", usuario.getPlan());
-
-        return ResponseEntity.ok(resp);
     }
 }

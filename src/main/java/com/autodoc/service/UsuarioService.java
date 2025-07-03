@@ -3,65 +3,68 @@ package com.autodoc.service;
 import com.autodoc.dto.UsuarioDTO;
 import com.autodoc.model.Usuario;
 import com.autodoc.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.UUID;
+import java.util.Optional;
 
 @Service
 public class UsuarioService {
 
-    @Autowired
-    private UsuarioRepository userRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public Usuario createUser(UsuarioDTO userDto) {
-        Usuario user = new Usuario();
-        user.setId(UUID.randomUUID().toString());
-        user.setPlan(userDto.getPlan());
-        user.setSubscriptionExpires(userDto.getSubscriptionExpires());
-        user.setFullName(userDto.getFullName());
-        user.setCreatedDate(new Date());
-        user.setUpdatedDate(new Date());
-        user.setEmail(userDto.getEmail());
-        user.setDisabled(userDto.getDisabled());
-        user.setIsVerified(userDto.getIsVerified());
-        user.setAppId(userDto.getAppId());
-        user.setAppRole(userDto.getAppRole());
-        user.setRole(userDto.getRole());
-
-        return userRepository.save(user);
+    public UsuarioService(UsuarioRepository usuarioRepository,
+                          PasswordEncoder passwordEncoder) {
+        this.usuarioRepository = usuarioRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
-    public Usuario getUserById(String id) {
-        return userRepository.findById(id).orElse(null);
-    }
-
-    public Usuario getUserByEmail(String email) {
-        return userRepository.findByEmail(email);
-    }
-
-    public Usuario updateUser(String id, UsuarioDTO userDto) {
-        Usuario user = userRepository.findById(id).orElse(null);
-        if (user != null) {
-            user.setPlan(userDto.getPlan());
-            user.setSubscriptionExpires(userDto.getSubscriptionExpires());
-            user.setFullName(userDto.getFullName());
-            user.setUpdatedDate(new Date());
-            user.setEmail(userDto.getEmail());
-            user.setDisabled(userDto.getDisabled());
-            user.setIsVerified(userDto.getIsVerified());
-            user.setAppId(userDto.getAppId()); // Faltava atualizar appId
-            user.setAppRole(userDto.getAppRole());
-            user.setRole(userDto.getRole());
-
-            return userRepository.save(user);
+    public Usuario criarUsuario(UsuarioDTO userDto) {
+        if (usuarioRepository.existsByEmail(userDto.getEmail())) {
+            throw new IllegalArgumentException("Email já está em uso");
         }
-        return null;
+
+        Usuario usuario = new Usuario();
+        usuario.setEmail(userDto.getEmail());
+        usuario.setPassword(passwordEncoder.encode(userDto.getPassword()));
+        usuario.setFullName(userDto.getFullName());
+        usuario.setRole(userDto.getRole());
+        // Defina outros campos conforme necessário
+
+        return usuarioRepository.save(usuario);
     }
 
+    public Optional<Usuario> getUserById(String id) {
+        return usuarioRepository.findById(id);
+    }
 
-    public void deleteUser(String id) {
-        userRepository.deleteById(id);
+    public Optional<Usuario> getUserByEmail(String email) {
+        return usuarioRepository.findByEmail(email);
+    }
+
+    public Optional<Usuario> updateUser(String id, UsuarioDTO userDto) {
+        return usuarioRepository.findById(id)
+                .map(usuario -> {
+                    if (userDto.getFullName() != null) {
+                        usuario.setFullName(userDto.getFullName());
+                    }
+                    if (userDto.getPassword() != null) {
+                        usuario.setPassword(passwordEncoder.encode(userDto.getPassword()));
+                    }
+                    if (userDto.getRole() != null) {
+                        usuario.setRole(userDto.getRole());
+                    }
+                    // Atualize outros campos conforme necessário
+                    return usuarioRepository.save(usuario);
+                });
+    }
+
+    public boolean deleteUser(String id) {
+        if (usuarioRepository.existsById(id)) {
+            usuarioRepository.deleteById(id);
+            return true;
+        }
+        return false;
     }
 }

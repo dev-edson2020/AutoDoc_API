@@ -12,8 +12,26 @@ public class UsuarioDTO {
     private String appId;
     private String appRole;
     private String role;
+    private String password;
 
     // Getters and Setters
+
+    public Boolean getVerified() {
+        return isVerified;
+    }
+
+    public void setVerified(Boolean verified) {
+        isVerified = verified;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
     public String getPlan() {
         return plan;
     }
